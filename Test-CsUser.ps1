@@ -128,12 +128,12 @@ function Get-AdUserInformation {
 	)
 
 	$LocalSite = (Get-ADDomainController -Discover).Site
-	[string] $GlobalCatalog = (Get-ADDomainController -Discover -SiteName $LocalSite).HostName
+	[string] $GlobalCatalog = (Get-ADDomainController -Discover -Service GlobalCatalog -SiteName $LocalSite).HostName
 	If (-Not $GlobalCatalog) { 
-		[string] $GlobalCatalog = (Get-ADDomainController -Discover -NextClosestSite).HostName
+		[string] $GlobalCatalog = (Get-ADDomainController -Discover -Service GlobalCatalog -NextClosestSite).HostName
 	}
 
-	if ( $user = Get-AdUser -Server $GlobalCatalog -Filter {userPrincipalName -eq "$upn"} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {
+	if ( $user = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {userPrincipalName -eq $upn} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {
 		#userPrincipalName found
 	}
 	else {
