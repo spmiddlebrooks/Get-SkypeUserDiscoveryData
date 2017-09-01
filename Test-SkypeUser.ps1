@@ -127,7 +127,7 @@ function Get-AdUserInformation {
 		[string] $upn
 	)
 
-	LocalSite = (Get-ADDomainController -Discover).Site
+	$LocalSite = (Get-ADDomainController -Discover).Site
 	[string] $GlobalCatalog = (Get-ADDomainController -Discover -SiteName $LocalSite).HostName
 	If (-Not $GlobalCatalog) { 
 		[string] $GlobalCatalog = (Get-ADDomainController -Discover -NextClosestSite).HostName
