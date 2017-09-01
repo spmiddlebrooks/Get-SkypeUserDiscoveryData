@@ -4,7 +4,7 @@ Test-CsUser will take a CSV input file of users and perform the following functi
 
 	1. Check that the user object exists in Active Directory, using userPrincipalName from the CSV input file as the Identifier.
 		a. Verify that the following addresses all match:  userPrincipalName, MsRtcSip-PrimaryUserAddress, Primary Smtp (from proxy addresses) and SIP (from proxy addresses)
-		b. Check each of the above addresses for invalid characters.
+		b. Check each address listed in item a. for invalid characters.
 		c. Optionally: Check for the existence of an Exchange Online Hybrid routing address, i.e. user@tenant.mail.onmicrosoft.com
 		c. Optionally: Check for the existence of any mail domains that should be flagged as erroneous
 	2. Check that the user object exists in Lync/Skype, using userPrincipalName from the CSV file as the Identifier.
