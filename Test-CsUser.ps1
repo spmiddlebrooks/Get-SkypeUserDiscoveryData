@@ -282,6 +282,7 @@ function Get-CsUserInformation {
 $RowNumber = 1
 
 $objReportTemplate = [PSCustomObject] @{
+	ErrorFlags = ''
 	FirstName = ''
 	LastName = ''
 	AdEnabled = ''
@@ -312,7 +313,6 @@ $objReportTemplate = [PSCustomObject] @{
 	RegistrarPool = ''
 	LineUri = ''
 	EnterpriseVoiceEnabled = ''
-	ErrorFlags = ''
 }
 
 
