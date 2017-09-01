@@ -127,7 +127,13 @@ function Get-AdUserInformation {
 		[string] $upn
 	)
 
-	if ( $user = Get-AdUser -LdapFilter "(&(userPrincipalName=$upn))" -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {
+	LocalSite = (Get-ADDomainController -Discover).Site
+	[string] $GlobalCatalog = (Get-ADDomainController -Discover -SiteName $LocalSite).HostName
+	If (-Not $GlobalCatalog) { 
+		[string] $GlobalCatalog = (Get-ADDomainController -Discover -NextClosestSite).HostName
+	}
+
+	if ( $user = Get-AdUser -Server $GlobalCatalog -Filter {userPrincipalName -eq "$upn"} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {
 		#userPrincipalName found
 	}
 	else {
