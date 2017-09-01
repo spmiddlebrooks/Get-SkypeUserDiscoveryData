@@ -361,7 +361,7 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.RegistrarPool = $CsUser.RegistrarPool
 				$objReportItem.LineUri = $CsUser.LineUri
 				$objReportItem.EnterpriseVoiceEnabled = $CsUser.EnterpriseVoiceEnabled
-				$objReportItem.ErrorFlags = $AdUser.errFlags
+				$objReportItem.ErrorFlags = $AdUser.ErrorFlags
 			}
 			Else {
 				Write-Verbose "User found in AD, but not in Lync/Skype"
@@ -374,8 +374,8 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
 				$objReportItem.PrimarySip = $AdUser.PrimarySip
 				$objReportItem.ProxySip = $AdUser.ProxySip
-				if ($AdUser.errFlags) {
-					$objReportItem.ErrorFlags = ($AdUser.errFlags + '|CsUser_NotFound')
+				if ($AdUser.ErrorFlags) {
+					$objReportItem.ErrorFlags = ($AdUser.ErrorFlags + '|CsUser_NotFound')
 				}
 				else {
 					$objReportItem.ErrorFlags = 'CsUser_NotFound'
