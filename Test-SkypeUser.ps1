@@ -15,7 +15,7 @@
 
 [cmdletbinding()]
 param( 
-	[Parameter(Mandatory=$True)]
+	[Parameter(Mandatory=$True,Position=0)]
 		[ValidateScript({
 			if ( Test-Path $_ ) {$True}
 			else {Throw "FilePath $_ not found"}
@@ -33,6 +33,18 @@ param(
 
 
 function Test-CsvFormat {
+	<#
+	.SYNOPSIS
+	.DESCRIPTION
+	.PARAMETER
+	.EXAMPLE
+	.NOTES
+		Version: 1.0
+		Updated: 8/30/2017
+		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
+	.LINK
+		https://github.com/spmiddlebrooks
+	#>
 	param (
 		[string] $CsvFilePath
 	)
@@ -74,6 +86,18 @@ function Test-CsvFormat {
 # End function Test-CsvFormat
 
 function Test-ForInvalidCharacters {
+	<#
+	.SYNOPSIS
+	.DESCRIPTION
+	.PARAMETER
+	.EXAMPLE
+	.NOTES
+		Version: 1.0
+		Updated: 8/30/2017
+		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
+	.LINK
+		https://github.com/spmiddlebrooks
+	#>
 	param (
 		[string] $strAddress,
 		[string] $addressType
@@ -87,6 +111,18 @@ function Test-ForInvalidCharacters {
 # End function Test-ForInvalidCharaters
 
 function Get-AdUserInformation {
+	<#
+	.SYNOPSIS
+	.DESCRIPTION
+	.PARAMETER
+	.EXAMPLE
+	.NOTES
+		Version: 1.0
+		Updated: 8/30/2017
+		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
+	.LINK
+		https://github.com/spmiddlebrooks
+	#>
 	param (	
 		[string] $upn
 	)
@@ -207,6 +243,18 @@ function Get-AdUserInformation {
 # End function Get-AdUserInformation
 
 function Get-CsUserInformation {
+	<#
+	.SYNOPSIS
+	.DESCRIPTION
+	.PARAMETER
+	.EXAMPLE
+	.NOTES
+		Version: 1.0
+		Updated: 8/30/2017
+		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
+	.LINK
+		https://github.com/spmiddlebrooks
+	#>
 	param (	
 		[string] $upn
 	)
@@ -237,7 +285,7 @@ $objReportTemplate = [PSCustomObject] @{
 	PrimarySmtp = ''
 	PrimarySip = ''
 	ProxySip = ''
-    VoicePolicy = ''
+	VoicePolicy = ''
 	VoiceRoutingPolicy = ''
 	ConferencingPolicy = ''
 	PresencePolicy = ''
@@ -279,8 +327,8 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem = $objReportTemplate.PSObject.Copy()
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
-                $objReportItem.AdEnabled = $AdUser.Enabled
-                $objReportItem.CsEnabled = $CsUser.Enabled
+				$objReportItem.AdEnabled = $AdUser.Enabled
+				$objReportItem.CsEnabled = $CsUser.Enabled
 				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
 				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
@@ -314,18 +362,18 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem = $objReportTemplate.PSObject.Copy()
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
-                $objReportItem.AdEnabled = $AdUser.Enabled
+				$objReportItem.AdEnabled = $AdUser.Enabled
 				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
 				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
 				$objReportItem.PrimarySip = $AdUser.PrimarySip
 				$objReportItem.ProxySip = $AdUser.ProxySip
-                if ($AdUser.errFlags) {
-				    $objReportItem.ErrorFlags = ($AdUser.errFlags + '|CsUser_NotFound')
-                }
-                else {
-                    $objReportItem.ErrorFlags = 'CsUser_NotFound'
-                }
+				if ($AdUser.errFlags) {
+					$objReportItem.ErrorFlags = ($AdUser.errFlags + '|CsUser_NotFound')
+				}
+				else {
+					$objReportItem.ErrorFlags = 'CsUser_NotFound'
+				}
 			}
 		}
 		Else {
@@ -333,7 +381,7 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 			$objReportItem = $objReportTemplate.PSObject.Copy()
 			$objReportItem.userPrincipalName = $($CsvUser.userPrincipalName)
 			$objReportItem.ErrorFlags = ('UPN_NotFound')
-        }
+		}
 
 	    $objReportItem
 	}
