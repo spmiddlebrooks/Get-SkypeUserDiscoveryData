@@ -12,4 +12,5 @@ Test-CsUser will take a CSV input file of users and perform the following functi
 		a. The output object will contain a field named "ErrorFlags."  This field will contain a pipe "|" delimited string of values containing all errors that were encountered during processing the userPrincipalName.  The field will be blank if no errors were found.
 
 The CSV file specified as the -FilePath parameter MUST contain a column named userPrincipalName.  Other columns can exist in the CSV and will be ignored.  For most use cases, you will probably want to use a command similar to the below to generate a report file in CSV format.
+
 Example: Test-CsUser.ps1 -FilePath CsvInputFile.csv | Export-Csv -NoTypeInformation -FilePath UserReport.csv
