@@ -14,4 +14,4 @@ Get-UserAttributes will read a CSV input file containing a list of userPrincipal
 
 The CSV file specified as the -FilePath parameter MUST contain a column named userPrincipalName.  Other columns can exist in the CSV and will be ignored.  For most use cases, you will probably want to use a command similar to the below to generate a report file in CSV format.
 
-Example: Test-CsUser.ps1 -FilePath CsvInputFile.csv | Export-Csv -NoTypeInformation -FilePath UserReport.csv
+Example: Get-UserAttributes.ps1 -FilePath CsvInputFile.csv | Export-Csv -NoTypeInformation -FilePath UserAttributeReport.csv
