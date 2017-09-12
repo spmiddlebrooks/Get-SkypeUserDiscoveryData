@@ -1,6 +1,6 @@
-# Get-UserAttributes
+# Get-SkypeUserDiscoveryData
 
-Get-UserAttributes will read a CSV input file containing a list of userPrincipalNames (UPN) and perform the following functions:
+Get-SkypeUserDiscoveryData will read a CSV input file containing a list of userPrincipalNames (UPN) and perform the following functions:
 
 	1. Check that the user object exists in Active Directory using userPrincipalName from the CSV input file as the Identifier.
 		a. Verify that the following addresses all match:  userPrincipalName, MsRtcSip-PrimaryUserAddress, Primary SMTP (from proxy addresses) and SIP (from proxy addresses)
@@ -14,4 +14,4 @@ Get-UserAttributes will read a CSV input file containing a list of userPrincipal
 
 The CSV file specified as the -FilePath parameter MUST contain a column named userPrincipalName.  Other columns can exist in the CSV and will be ignored.  For most use cases, you will probably want to use a command similar to the below to generate a report file in CSV format.
 
-Example: Get-UserAttributes.ps1 -FilePath CsvInputFile.csv | Export-Csv -NoTypeInformation -FilePath UserAttributeReport.csv
+Example: Get-SkypeUserDiscoveryData.ps1 -FilePath CsvInputFile.csv | Export-Csv -NoTypeInformation -FilePath SkypeUserDiscoveryData.csv
