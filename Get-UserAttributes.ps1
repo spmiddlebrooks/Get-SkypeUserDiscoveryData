@@ -11,7 +11,7 @@
 	https://github.com/spmiddlebrooks
 #>
 #Requires -Version 3.0
-#Rquires -Modules ActiveDirectory,Lync
+#Requires -Modules ActiveDirectory,Lync
 
 [cmdletbinding()]
 param( 
