@@ -4,7 +4,7 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.4
+	Version: 1.1.5
 	Updated: 9/21/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
@@ -423,18 +423,19 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 
 		If ( $AdUser = Get-AdUserInformation -GlobalCatalog $AdGlobalCatalog -Identity $($CsvUser.Identity) ) {
 			Write-Verbose "Identity found in AD"
+			$objReportItem = $objReportTemplate.PSObject.Copy()
+			$objReportItem.FirstName = $($AdUser.FirstName)
+			$objReportItem.LastName = $($AdUser.LastName)
+			$objReportItem.AdEnabled = $AdUser.Enabled
+			$objReportItem.CsEnabled = $AdUser.CsEnabled
+			$objReportItem.CsvIdentity = $CsvUser.Identity
+			$objReportItem.samAccountName = $($AdUser.samAccountName)
+			$objReportItem.userPrincipalName = $($AdUser.userPrincipalName)
+			$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
+
 			If ( $AdUser.CsEnabled ) {
 				Write-Verbose "Identity is Lync/Skype enabled"
 				$CsUser = Get-CsUserInformation $($AdUser.userPrincipalName)
-				$objReportItem = $objReportTemplate.PSObject.Copy()
-				$objReportItem.FirstName = $($AdUser.FirstName)
-				$objReportItem.LastName = $($AdUser.LastName)
-				$objReportItem.AdEnabled = $AdUser.Enabled
-				$objReportItem.CsEnabled = $AdUser.CsEnabled
-				$objReportItem.CsvIdentity = $CsvUser.Identity
-				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
-				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
-				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
 				$objReportItem.PrimarySip = $AdUser.PrimarySip
 				$objReportItem.ProxySip = $AdUser.ProxySip
 				$objReportItem.VoicePolicy = $CsUser.VoicePolicy
@@ -462,17 +463,6 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 			}
 			Else {
 				Write-Verbose "Identity is NOT Lync/Skype enabled"
-				$objReportItem = $objReportTemplate.PSObject.Copy()
-				$objReportItem.FirstName = $($AdUser.FirstName)
-				$objReportItem.LastName = $($AdUser.LastName)
-				$objReportItem.AdEnabled = $AdUser.Enabled
-				$objReportItem.CsEnabled = $AdUser.CsEnabled				
-				$objReportItem.CsvIdentity = $CsvUser.Identity
-				$objReportItem.samAccountName = $($AdUser.samAccountName)
-				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName)
-				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
-				$objReportItem.PrimarySip = $AdUser.PrimarySip
-				$objReportItem.ProxySip = $AdUser.ProxySip
 			}
 		}
 		Else {
