@@ -4,7 +4,7 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.2
+	Version: 1.1.3
 	Updated: 9/21/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
@@ -21,10 +21,10 @@ param(
 			else {Throw "FilePath $_ not found"}
 		})]	
 		[string] $FilePath = "",
-    	[Parameter(Mandatory=$False)]
+    [Parameter(Mandatory=$False)]
 		[ValidateNotNullorEmpty()]
-        	[ValidateSet('SamAccountName','mail','userPrincipalName')]
-        	[string] $IdentityAttribute = 'userPrincipalName',
+        [ValidateSet('SamAccountName','mail','userPrincipalName')]
+        [string] $IdentityAttribute = 'userPrincipalName',
 	[Parameter(Mandatory=$False)]
 		[string] $IdentityRegEx,
 	[Parameter(Mandatory=$False)]
@@ -50,9 +50,9 @@ function Set-ModuleStatus {
 #>
 	[CmdletBinding(SupportsShouldProcess = $true)]
 	param	(
-		[parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Mandatory = $true, HelpMessage = "No module name specified!")] 
-		[ValidateNotNullOrEmpty()]
-		[string] $name
+		[Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Mandatory = $true, HelpMessage = "No module name specified!")] 
+			[ValidateNotNullOrEmpty()]
+			[string] $name
 	)
 	PROCESS{
 		# Executes once for each pipeline object
@@ -142,21 +142,20 @@ function Test-ForInvalidCharacters {
 }
 # End function Test-ForInvalidCharaters
 
-function Get-AdUserInformation {
+function Get-AdGlobalCatalog {
 	<#
 	.SYNOPSIS
 	.DESCRIPTION
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.1.2
+		Version: 1.0
 		Updated: 9/21/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
 		https://github.com/spmiddlebrooks
 	#>
 	param (	
-		[string] $Identity
 	)
 
 	$LocalSite = (Get-ADDomainController -Discover).Site
@@ -164,130 +163,164 @@ function Get-AdUserInformation {
 	If (-Not $GlobalCatalog) { 
 		[string] $GlobalCatalog = (Get-ADDomainController -Discover -Service GlobalCatalog -NextClosestSite).HostName
 	}
+    return $GlobalCatalog
+}
+# End function Get-AdGlobalCatalog
 
-        if ($IdentityRegex -and $Identity -match $IdentityRegex ) {
-        	$Identity = $matches[1]
-		$Matches.Clear()
-    	}
+function Get-AdUserInformation {
+	<#
+	.SYNOPSIS
+	.DESCRIPTION
+	.PARAMETER
+	.EXAMPLE
+	.NOTES
+		Version: 1.1.3
+		Updated: 9/21/2017
+		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
+	.LINK
+		https://github.com/spmiddlebrooks
+	#>
+	param (	
+        [string] $GlobalCatalog,
+		[string] $Identity
+	)
+    [bool] $CsUserEnabled = $false
 
-	if ( $user = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {	
+    if ($IdentityRegex -and $Identity -match $IdentityRegex ) {
+        $Identity = $Matches[1]
+        $Matches.Clear()
+    }
+
+	if ( $AdUser = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -Properties Enabled,proxyaddresses,msRTCSIP-UserEnabled,msRTCSIP-PrimaryUserAddress ) {	
 		#Identity found
+		
+		$upn 				= $AdUser.userPrincipalName.ToLower()	
+		$proxyaddresses     = $AdUser.proxyaddresses
+		$PrimarySmtp 		= $null
+		$PrimarySip			= $null
+		$ProxySip    		= $null
+		$errFlags 			= @()
+		
+		# Is user Lync/Skype Enabled?
+		if ( $AdUser."msRTCSIP-UserEnabled" ) {
+			$CsUserEnabled = $true
+
+			# Check that msRTCSIP-PrimaryUserAddress exists with correct format
+			if ( $AdUser."msRTCSIP-PrimaryUserAddress" -and $AdUser."msRTCSIP-PrimaryUserAddress" -match 'sip:(.+@[\w-\.]+)' ) {
+				# Convert to all lowercase		
+				$PrimarySip = $Matches[1].ToLower()
+				$Matches.Clear()
+			}
+			# If msRTCSIP-PrimaryUserAddress exists but is not the correct format, log Error
+			elseif ($AdUser."msRTCSIP-PrimaryUserAddress") {
+				$errFlags = 'PrimarySIP_Exists_InvalidFormat'
+			}
+		}
+	
+		# Extract primary SMTP and SIP addresses from proxyaddresses attribute
+		foreach ($proxyaddress in $proxyaddresses) {
+			$null = $proxyaddress -match "(SMTP|SIP):(.+@[\w-\.]+);?"
+	
+			if ($Matches) {
+				$qualifier = $matches[1]
+				$address   = $matches[2]
+			
+				if ($qualifier -match 'SIP') {
+					$ProxySip = $address.tolower()
+				}
+				elseif ($qualifier -match 'SMTP') {
+					### Get primary SMTP address
+					if ($qualifier -cmatch 'SMTP') {
+						$PrimarySmtp = $address.tolower()
+					}
+					### Check for O365 mail routing domain
+					elseif ($CheckExoRoutingDomain -AND $address -match $ExoRoutingDomain) {
+						$ExoRoutingAddress = $address.tolower()
+					}
+					### Check for invalid email domains
+					elseif ($CheckForInvalidDomains -AND $address -match $InvalidDomainRegex) {
+						$errFlags += 'Invalid_Email_Domain'
+					}
+				}
+				$Matches.Clear()
+			}
+		}
+	
+		# If CheckExoRoutingDomain is set and there is no ExoRouting Address, log Error 
+		if ($CheckExoRoutingDomain -and -Not $ExoRoutingAddress) {
+			$errFlags += 'No_Msol_Smtp'
+		}
+
+		# If we have a userPrincipalName with at least one of: Smtp or Sip
+		if ($upn -AND ($PrimarySmtp -OR $PrimarySip -OR $ProxySip)) {
+			$errFlags += Test-ForInvalidCharacters $upn 'Upn'
+	
+			### PrimarySmtp address checks
+			# If we have a SMTP address and userPrincipalName and SMTP match
+			if ($PrimarySmtp -AND $upn -eq $PrimarySmtp) {
+				$errFlags += Test-ForInvalidCharacters $PrimarySmtp 'PrimarySmtp'
+			}
+			elseif (!$PrimarySmtp) {
+				$errFlags += 'No_PrimarySmtp'
+			}
+			else {
+				$errFlags += 'Upn_NE_PrimarySmtp'
+			}
+	
+			### PrimarySip & ProxySip address checks
+			if ($CsUserEnabled) {
+				if ( $PrimarySip -AND $upn -eq $PrimarySip ) {
+					$errFlags += Test-ForInvalidCharacters $PrimarySip 'PrimarySip'
+		
+					if ($ProxySip -AND $upn -eq $ProxySip) {
+						$errFlags += Test-ForInvalidCharacters $ProxySip 'ProxySip'
+					}
+					elseif (!$ProxySip) {
+						$errFlags += 'PrimaySIP_without_ProxySip'
+					}
+					else {
+						$errFlags += 'ProxySIP_NE_Upn_PrimarySIP'
+					}
+				}
+				elseif (!$PrimarySip) {
+					$errFlags += 'No_PrimarySip'
+		
+					if ($ProxySip) {
+						$errFlags += 'ProxySIP_without_PrimarySip'
+					}
+				}
+				else {
+					$errFlags += 'Upn_NE_PrimarySip_ProxySip'
+				}
+			}
+		}
+		# If we only have userPrincipalName without any of the other addresses
+		elseif ($upn) {
+			$errFlags += Test-ForInvalidCharacters $upn 'Upn'
+			$errFlags += 'Upn_without_Smtp_Sip'
+		}
+		else {
+			$errFlags += 'No_Upn'
+		}
+	
+		$AdUser = [PSCustomObject] @{
+			FirstName = $($AdUser.GivenName)
+			LastName = $($AdUser.Surname)
+			Enabled = $($AdUser.Enabled)
+            CsEnabled = $CsUserEnabled
+			samAccountName = $($AdUser.samAccountName.ToLower())
+			userPrincipalName = $($AdUser.userPrincipalName.ToLower())
+			PrimarySmtp = $PrimarySmtp
+			PrimarySip = $PrimarySip
+			ProxySip = $ProxySip
+			ErrorFlags = ($errFlags -join '|')
+		}
+		return $AdUser
 	}
 	else {
 		#Identity NOT found
-		return
+		return $False
 	}
-
-	$upn 				= $user.userPrincipalName.ToLower()	
-	$proxyaddresses     = $user.proxyaddresses
-	$PrimarySmtp 		= $null
-	$PrimarySip			= $null
-	$ProxySip    		= $null
-	$errFlags 			= @()
-	
-    	# Check that msRTCSIP-PrimaryUserAddress exists with correct format
-	if ( $user."msRTCSIP-PrimaryUserAddress" -and $user."msRTCSIP-PrimaryUserAddress" -match 'sip:(.+@[\w-\.]+)' ) {
-       		# Convert to all lowercase		
-        	$PrimarySip = $Matches[1].ToLower()
-        	$Matches.Clear()
-	}
-    	elseif ($user."msRTCSIP-PrimaryUserAddress") {
-        	$errFlags = 'PrimarySIP_Exists_InvalidFormat'
-    	}
-
-	foreach ($proxyaddress in $proxyaddresses) {
-		$null = $proxyaddress -match "(SMTP|SIP):(.+@[\w-\.]+);?"
-
-		if ($matches) {
-			$qualifier = $matches[1]
-			$address   = $matches[2]
-		
-			if ($qualifier -match 'SIP') {
-				$ProxySip = $address.tolower()
-			}
-			elseif ($qualifier -match 'SMTP') {
-				### Get primary SMTP address
-				if ($qualifier -cmatch 'SMTP') {
-					$PrimarySmtp = $address.tolower()
-				}
-				### Check for O365 mail routing domain
-				elseif ($check_msol_smtp -AND $address -match $msol_smtp_domain) {
-					$msol_smtp = $address.tolower()
-				}
-				### Check for invalid email domains
-				elseif ($check_invalid_email_domains -AND $address -match $invalid_email_domain_regex) {
-					$errFlags += 'Invalid_Email_Domain'
-				}
-			}
-			$matches.clear()
-		}
-	}
-
-	if ($check_msol_smtp -and !$msol_smtp) {
-		$errFlags += 'No_Msol_Smtp'
-	}
-
-	if ($upn -AND ($PrimarySmtp -OR $PrimarySip -OR $ProxySip)) {
-		$errFlags += Test-ForInvalidCharacters $upn 'Upn'
-
-		### PrimarySmtp address checks
-		if ($PrimarySmtp -AND $upn -eq $PrimarySmtp) {
-			$errFlags += Test-ForInvalidCharacters $PrimarySmtp 'PrimarySmtp'
-		}
-		elseif (!$PrimarySmtp) {
-			$errFlags += 'No_PrimarySmtp'
-		}
-		else {
-			$errFlags += 'Upn_NE_PrimarySmtp'
-		}
-
-		### PrimarySip & ProxySip address checks
-		if ($PrimarySip -AND $upn -eq $PrimarySip) {
-			$errFlags += Test-ForInvalidCharacters $PrimarySip 'PrimarySip'
-
-			if ($ProxySip -AND $upn -eq $ProxySip) {
-				$errFlags += Test-ForInvalidCharacters $ProxySip 'ProxySip'
-			}
-			elseif (!$ProxySip) {
-				$errFlags += 'PrimaySIP_without_ProxySip'
-			}
-			else {
-				$errFlags += 'ProxySIP_NE_Upn_PrimarySIP'
-			}
-		}
-		elseif (!$PrimarySip) {
-			$errFlags += 'No_PrimarySip'
-
-			if ($ProxySip) {
-				$errFlags += 'ProxySIP_without_PrimarySip'
-			}
-		}
-		else {
-			$errFlags += 'Upn_NE_PrimarySip_ProxySip'
-		}		
-
-	}
-	elseif ($upn) {
-		$errFlags += Test-ForInvalidCharacters $upn 'Upn'
-		$errFlags += 'Upn_without_Smtp_Sip'
-	}
-	else {
-		$errFlags += 'No_Upn'
-	}
-
-	$AdUser = [PSCustomObject] @{
-		FirstName = $($user.GivenName)
-		LastName = $($user.Surname)
-        Enabled = $user.enabled
-		samAccountName = $($user.samAccountName.ToLower())
-		userPrincipalName = $($user.userPrincipalName.ToLower())
-		PrimarySmtp = $PrimarySmtp
-		PrimarySip = $PrimarySip
-		ProxySip = $ProxySip
-		ErrorFlags = ($errFlags -join '|')
-	}
-	
-	return $AdUser
 }
 # End function Get-AdUserInformation
 
@@ -324,19 +357,6 @@ function Get-CsUserInformation {
 ############################################################################
 $RowNumber = 1
 
-# Attempt to load the SkypeforBusiness module
-if (Set-ModuleStatus SkypeForBusiness) {
-    $UcPlatform = 'SkypeforBusiness'
-}
-# If the SkypeforBusiness module is not present, attempt to load the Lync module
-elseif (Set-ModuleStatus Lync) {
-    $UcPlatform = 'Lync'
-}
-# If neither module is present throw an exception to prevent further operations
-else {
-    throw "Cannot proceed, could not load Skype for Business or Lync PowerShell module"
-}
-
 $objReportTemplate = [PSCustomObject] @{
 	ErrorFlags = ''
 	FirstName = ''
@@ -372,6 +392,22 @@ $objReportTemplate = [PSCustomObject] @{
 	EnterpriseVoiceEnabled = ''
 }
 
+# Attempt to load the SkypeforBusiness module
+if (Set-ModuleStatus SkypeForBusiness) {
+    $UcPlatform = 'SkypeforBusiness'
+}
+# If the SkypeforBusiness module is not present, attempt to load the Lync module
+elseif (Set-ModuleStatus Lync) {
+    $UcPlatform = 'Lync'
+}
+# If neither module is present throw an exception to prevent further operations
+else {
+    throw "Cannot proceed, could not load Skype for Business or Lync PowerShell module"
+}
+
+$AdGlobalCatalog = Get-AdGlobalCatalog
+
+Write-Verbose "AdGlobalCatalog = $AdGlobalCatalog"
 
 If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 
@@ -383,10 +419,13 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 		Write-Progress -Activity "Processing Users" -Status "Processing $RowNumber of $AllCsvUsersCount)" -PercentComplete (($RowNumber / $AllCsvUsers.Count) * 100)
 		$RowNumber += 1
 
-		If ( $AdUser = Get-AdUserInformation $($CsvUser.Identity) ) {
-			Write-Verbose "User found in AD"
-			If ( $CsUser = Get-CsUserInformation $($AdUser.userPrincipalName) ) {
-				Write-Verbose "User found in Lync/Skype"
+        Write-Verbose "Identity = $($CsvUser.Identity)"
+
+		If ( $AdUser = Get-AdUserInformation -GlobalCatalog $AdGlobalCatalog -Identity $($CsvUser.Identity) ) {
+            Write-Verbose "Identity found in AD"
+			If ( $AdUser.CsEnabled ) {
+				Write-Verbose "Identity is Lync/Skype enabled"
+				$CsUser = Get-CsUserInformation $($AdUser.userPrincipalName)
 				$objReportItem = $objReportTemplate.PSObject.Copy()
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
@@ -422,14 +461,14 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.ErrorFlags = $AdUser.ErrorFlags
 			}
 			Else {
-				Write-Verbose "User found in AD, but not in Lync/Skype"
+				Write-Verbose "Identity is NOT Lync/Skype enabled"
 				$objReportItem = $objReportTemplate.PSObject.Copy()
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
 				$objReportItem.AdEnabled = $AdUser.Enabled
                 $objReportItem.CsvIdentity = $CsvUser.Identity
-				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
-				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
+				$objReportItem.samAccountName = $($AdUser.samAccountName)
+				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName)
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
 				$objReportItem.PrimarySip = $AdUser.PrimarySip
 				$objReportItem.ProxySip = $AdUser.ProxySip
@@ -442,12 +481,13 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 			}
 		}
 		Else {
-			Write-Verbose "User not found in AD"
+			Write-Verbose "Identity NOT found in AD"
 			$objReportItem = $objReportTemplate.PSObject.Copy()
 			$objReportItem.CsvIdentity = $CsvUser.Identity
 			$objReportItem.ErrorFlags = ('AdUser_NotFound')
 		}
 
 	    $objReportItem
+
 	}
 }
