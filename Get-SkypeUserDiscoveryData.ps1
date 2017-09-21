@@ -4,7 +4,7 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.1
+	Version: 1.1.2
 	Updated: 9/21/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
@@ -149,7 +149,7 @@ function Get-AdUserInformation {
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.1.1
+		Version: 1.1.2
 		Updated: 9/21/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
@@ -167,6 +167,7 @@ function Get-AdUserInformation {
 
         if ($IdentityRegex -and $Identity -match $IdentityRegex ) {
         	$Identity = $matches[1]
+		$Matches.Clear()
     	}
 
 	if ( $user = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {	
@@ -184,9 +185,15 @@ function Get-AdUserInformation {
 	$ProxySip    		= $null
 	$errFlags 			= @()
 	
-	if ($user."msRTCSIP-PrimaryUserAddress") {
-		$PrimarySip = ($user."msRTCSIP-PrimaryUserAddress".tolower() -split ':')[1]
+    	# Check that msRTCSIP-PrimaryUserAddress exists with correct format
+	if ( $user."msRTCSIP-PrimaryUserAddress" -and $user."msRTCSIP-PrimaryUserAddress" -match 'sip:(.+@[\w-\.]+)' ) {
+       		# Convert to all lowercase		
+        	$PrimarySip = $Matches[1].ToLower()
+        	$Matches.Clear()
 	}
+    	elseif ($user."msRTCSIP-PrimaryUserAddress") {
+        	$errFlags = 'PrimarySIP_Exists_InvalidFormat'
+    	}
 
 	foreach ($proxyaddress in $proxyaddresses) {
 		$null = $proxyaddress -match "(SMTP|SIP):(.+@[\w-\.]+);?"
