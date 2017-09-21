@@ -4,7 +4,7 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1
+	Version: 1.1.1
 	Updated: 9/21/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
@@ -21,9 +21,12 @@ param(
 			else {Throw "FilePath $_ not found"}
 		})]	
 		[string] $FilePath = "",
-    [Parameter(Mandatory=$False)]
-        [ValidateSet('SamAccountName','mail','userPrincipalName')]
-        [string] $IdentityAttribute = 'userPrincipalName',
+    	[Parameter(Mandatory=$False)]
+		[ValidateNotNullorEmpty()]
+        	[ValidateSet('SamAccountName','mail','userPrincipalName')]
+        	[string] $IdentityAttribute = 'userPrincipalName',
+	[Parameter(Mandatory=$False)]
+		[string] $IdentityRegEx,
 	[Parameter(Mandatory=$False)]
 		[switch] $CheckExoRoutingDomain,
 	[Parameter(Mandatory=$False)]
@@ -93,16 +96,6 @@ function Test-CsvFormat {
 	$ColumnsExpected = @(
 		'Identity'
 	)
-	<#
-	$ColumnsExpected = @(
-		'userPrincipalName',
-		'emailAddress',
-		'telephone',
-		'RegistrarPool',
-		'ConferencePolicy',
-		'ClientPolicy'
-	)
-	#>
 	
 	## Verify that all expected columns are there (additional columns in the csv will be ignored)
 	$ColumnsOK = $True
@@ -156,7 +149,7 @@ function Get-AdUserInformation {
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.1
+		Version: 1.1.1
 		Updated: 9/21/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
@@ -172,7 +165,9 @@ function Get-AdUserInformation {
 		[string] $GlobalCatalog = (Get-ADDomainController -Discover -Service GlobalCatalog -NextClosestSite).HostName
 	}
 
-    
+        if ($IdentityRegex -and $Identity -match $IdentityRegex ) {
+        	$Identity = $matches[1]
+    	}
 
 	if ( $user = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {	
 		#Identity found
