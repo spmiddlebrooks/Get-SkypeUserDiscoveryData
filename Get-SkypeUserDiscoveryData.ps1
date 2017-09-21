@@ -4,7 +4,7 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.3
+	Version: 1.1.4
 	Updated: 9/21/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
@@ -419,10 +419,10 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 		Write-Progress -Activity "Processing Users" -Status "Processing $RowNumber of $AllCsvUsersCount)" -PercentComplete (($RowNumber / $AllCsvUsers.Count) * 100)
 		$RowNumber += 1
 
-        Write-Verbose "Identity = $($CsvUser.Identity)"
+        	Write-Verbose "Identity = $($CsvUser.Identity)"
 
 		If ( $AdUser = Get-AdUserInformation -GlobalCatalog $AdGlobalCatalog -Identity $($CsvUser.Identity) ) {
-            Write-Verbose "Identity found in AD"
+			Write-Verbose "Identity found in AD"
 			If ( $AdUser.CsEnabled ) {
 				Write-Verbose "Identity is Lync/Skype enabled"
 				$CsUser = Get-CsUserInformation $($AdUser.userPrincipalName)
@@ -430,8 +430,8 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
 				$objReportItem.AdEnabled = $AdUser.Enabled
-				$objReportItem.CsEnabled = $CsUser.Enabled
-                $objReportItem.CsvIdentity = $CsvUser.Identity
+				$objReportItem.CsEnabled = $AdUser.CsEnabled
+				$objReportItem.CsvIdentity = $CsvUser.Identity
 				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
 				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
@@ -466,18 +466,13 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
 				$objReportItem.AdEnabled = $AdUser.Enabled
-                $objReportItem.CsvIdentity = $CsvUser.Identity
+				$objReportItem.CsEnabled = $AdUser.CsEnabled				
+				$objReportItem.CsvIdentity = $CsvUser.Identity
 				$objReportItem.samAccountName = $($AdUser.samAccountName)
 				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName)
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
 				$objReportItem.PrimarySip = $AdUser.PrimarySip
 				$objReportItem.ProxySip = $AdUser.ProxySip
-				if ($AdUser.ErrorFlags) {
-					$objReportItem.ErrorFlags = ($AdUser.ErrorFlags + '|CsUser_NotFound')
-				}
-				else {
-					$objReportItem.ErrorFlags = 'CsUser_NotFound'
-				}
 			}
 		}
 		Else {
