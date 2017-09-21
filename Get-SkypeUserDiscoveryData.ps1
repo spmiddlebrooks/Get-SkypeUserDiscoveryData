@@ -4,14 +4,14 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.0
-	Updated: 8/30/2017
+	Version: 1.1
+	Updated: 9/21/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
 	https://github.com/spmiddlebrooks
 #>
 #Requires -Version 3.0
-#Requires -Modules ActiveDirectory,Lync
+#Requires -Modules ActiveDirectory
 
 [cmdletbinding()]
 param( 
@@ -21,6 +21,9 @@ param(
 			else {Throw "FilePath $_ not found"}
 		})]	
 		[string] $FilePath = "",
+    [Parameter(Mandatory=$False)]
+        [ValidateSet('SamAccountName','mail','userPrincipalName')]
+        [string] $IdentityAttribute = 'userPrincipalName',
 	[Parameter(Mandatory=$False)]
 		[switch] $CheckExoRoutingDomain,
 	[Parameter(Mandatory=$False)]
@@ -31,6 +34,42 @@ param(
 		[string] $InvalidDomainRegex = ".+@()"
 )
 
+function Set-ModuleStatus { 
+<#
+.SYNOPSIS
+.DESCRIPTION
+.PARAMETER
+.EXAMPLE
+.NOTES
+	Original Author: Pat Richard
+.LINK
+	https://www.ucunleashed.com/938
+#>
+	[CmdletBinding(SupportsShouldProcess = $true)]
+	param	(
+		[parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, Mandatory = $true, HelpMessage = "No module name specified!")] 
+		[ValidateNotNullOrEmpty()]
+		[string] $name
+	)
+	PROCESS{
+		# Executes once for each pipeline object
+		# the $_ variable represents the current input object		
+		if (!(Get-Module -name "$name")) { 
+			if (Get-Module -ListAvailable | Where-Object Name -eq "$name") { 
+				Import-Module -Name "$name"
+				# module was imported
+				return $true
+			} else {
+				# module was not available
+				return $false
+			}
+		} else {
+			# Write-Output "$_ module already imported"
+			return $true
+		} 
+	} # end PROCESS
+} 
+# End function Set-ModuleStatus
 
 function Test-CsvFormat {
 	<#
@@ -39,8 +78,8 @@ function Test-CsvFormat {
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.0
-		Updated: 8/30/2017
+		Version: 1.1
+		Updated: 9/21/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
 		https://github.com/spmiddlebrooks
@@ -52,7 +91,7 @@ function Test-CsvFormat {
 
 	## List all columns that MUST be in the csv:
 	$ColumnsExpected = @(
-		'userPrincipalName'
+		'Identity'
 	)
 	<#
 	$ColumnsExpected = @(
@@ -117,14 +156,14 @@ function Get-AdUserInformation {
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.0
-		Updated: 8/30/2017
+		Version: 1.1
+		Updated: 9/21/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
 		https://github.com/spmiddlebrooks
 	#>
 	param (	
-		[string] $upn
+		[string] $Identity
 	)
 
 	$LocalSite = (Get-ADDomainController -Discover).Site
@@ -133,15 +172,17 @@ function Get-AdUserInformation {
 		[string] $GlobalCatalog = (Get-ADDomainController -Discover -Service GlobalCatalog -NextClosestSite).HostName
 	}
 
-	if ( $user = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {userPrincipalName -eq $upn} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {
-		#userPrincipalName found
+    
+
+	if ( $user = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -properties enabled,proxyaddresses,msRTCSIP-PrimaryUserAddress ) {	
+		#Identity found
 	}
 	else {
-		#userPrincipalName NOT found
+		#Identity NOT found
 		return
 	}
 
-	$upn 				= $upn.ToLower()	
+	$upn 				= $user.userPrincipalName.ToLower()	
 	$proxyaddresses     = $user.proxyaddresses
 	$PrimarySmtp 		= $null
 	$PrimarySip			= $null
@@ -281,12 +322,26 @@ function Get-CsUserInformation {
 ############################################################################
 $RowNumber = 1
 
+# Attempt to load the SkypeforBusiness module
+if (Set-ModuleStatus SkypeForBusiness) {
+    $UcPlatform = 'SkypeforBusiness'
+}
+# If the SkypeforBusiness module is not present, attempt to load the Lync module
+elseif (Set-ModuleStatus Lync) {
+    $UcPlatform = 'Lync'
+}
+# If neither module is present throw an exception to prevent further operations
+else {
+    throw "Cannot proceed, could not load Skype for Business or Lync PowerShell module"
+}
+
 $objReportTemplate = [PSCustomObject] @{
 	ErrorFlags = ''
 	FirstName = ''
 	LastName = ''
 	AdEnabled = ''
 	CsEnabled = ''
+    CsvIdentity = ''
 	samAccountName = ''
 	userPrincipalName = ''
 	PrimarySmtp = ''
@@ -325,16 +380,17 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 
 		Write-Progress -Activity "Processing Users" -Status "Processing $RowNumber of $AllCsvUsersCount)" -PercentComplete (($RowNumber / $AllCsvUsers.Count) * 100)
 		$RowNumber += 1
-	
-		If ( $AdUser = Get-AdUserInformation $($CsvUser.userPrincipalName) ) {
+
+		If ( $AdUser = Get-AdUserInformation $($CsvUser.Identity) ) {
 			Write-Verbose "User found in AD"
-			If ( $CsUser = Get-CsUserInformation $($CsvUser.userPrincipalName) ) {
+			If ( $CsUser = Get-CsUserInformation $($AdUser.userPrincipalName) ) {
 				Write-Verbose "User found in Lync/Skype"
 				$objReportItem = $objReportTemplate.PSObject.Copy()
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
 				$objReportItem.AdEnabled = $AdUser.Enabled
 				$objReportItem.CsEnabled = $CsUser.Enabled
+                $objReportItem.CsvIdentity = $CsvUser.Identity
 				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
 				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
@@ -369,6 +425,7 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.FirstName = $($AdUser.FirstName)
 				$objReportItem.LastName = $($AdUser.LastName)
 				$objReportItem.AdEnabled = $AdUser.Enabled
+                $objReportItem.CsvIdentity = $CsvUser.Identity
 				$objReportItem.samAccountName = $($AdUser.samAccountName.ToLower())
 				$objReportItem.userPrincipalName = $($AdUser.userPrincipalName.ToLower())
 				$objReportItem.PrimarySmtp = $AdUser.PrimarySmtp
@@ -385,8 +442,8 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 		Else {
 			Write-Verbose "User not found in AD"
 			$objReportItem = $objReportTemplate.PSObject.Copy()
-			$objReportItem.userPrincipalName = $($CsvUser.userPrincipalName)
-			$objReportItem.ErrorFlags = ('UPN_NotFound')
+			$objReportItem.CsvIdentity = $CsvUser.Identity
+			$objReportItem.ErrorFlags = ('AdUser_NotFound')
 		}
 
 	    $objReportItem
