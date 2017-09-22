@@ -26,7 +26,7 @@ param(
         [ValidateSet('SamAccountName','mail','userPrincipalName')]
         [string] $IdentityAttribute = 'userPrincipalName',
 	[Parameter(Mandatory=$False)]
-		[string] $IdentityRegEx = '(?:sip:)?<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?',
+		[string] $IdentityRegEx = '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b',
 	[Parameter(Mandatory=$False)]
 		[switch] $CheckExoRoutingDomain,
 	[Parameter(Mandatory=$False)]
