@@ -243,9 +243,7 @@ function Get-AdUserInformation {
 	
 		# Extract primary SMTP and SIP addresses from proxyaddresses attribute
 		foreach ($proxyaddress in $proxyaddresses) {
-			$null = $proxyaddress -match "(SMTP|SIP):(.+@[\w-\.]+);?"
-	
-			if ($Matches) {
+			if ($proxyaddress -match "(SMTP|SIP):(.+@[\w-\.]+);?" ) {
 				$qualifier = $matches[1]
 				$address   = $matches[2]
 			
