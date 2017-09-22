@@ -4,8 +4,8 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.6
-	Updated: 9/21/2017
+	Version: 1.1.7
+	Updated: 9/22/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
 	https://github.com/spmiddlebrooks
@@ -26,7 +26,7 @@ param(
         [ValidateSet('SamAccountName','mail','userPrincipalName')]
         [string] $IdentityAttribute = 'userPrincipalName',
 	[Parameter(Mandatory=$False)]
-		[string] $IdentityRegEx,
+		[string] $IdentityRegEx = '(?:sip:)?<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?',
 	[Parameter(Mandatory=$False)]
 		[switch] $CheckExoRoutingDomain,
 	[Parameter(Mandatory=$False)]
@@ -167,6 +167,32 @@ function Get-AdGlobalCatalog {
 }
 # End function Get-AdGlobalCatalog
 
+function Test-RegexPattern {
+	<#
+	.SYNOPSIS
+	.DESCRIPTION
+	.PARAMETER
+	.EXAMPLE
+	.NOTES
+		Version: 1.0
+		Updated: 9/22/2017
+		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
+	.LINK
+		https://github.com/spmiddlebrooks
+	#>
+	param (	
+        $RegexPattern
+	)
+
+    try {
+        New-Object Regex $RegexPattern
+    }
+    catch {
+        throw 'Invalid Regex pattern specified for IdentityRegex'
+    }
+}
+# End function Test-RegexPattern
+
 function Get-AdUserInformation {
 	<#
 	.SYNOPSIS
@@ -174,8 +200,8 @@ function Get-AdUserInformation {
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.1.3
-		Updated: 9/21/2017
+		Version: 1.1.4
+		Updated: 9/22/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
 		https://github.com/spmiddlebrooks
@@ -186,9 +212,10 @@ function Get-AdUserInformation {
 	)
     [bool] $CsUserEnabled = $false
 
-    if ($IdentityRegex -and $Identity -match $IdentityRegex ) {
+    if ($IdentityRegex -and $Identity -match $IdentityRegex) {
         $Identity = $Matches[1]
         $Matches.Clear()
+        Write-Verbose "Regex matched Identity = $Identity"
     }
 
 	if ( $AdUser = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -Properties Enabled,proxyaddresses,msRTCSIP-UserEnabled,msRTCSIP-PrimaryUserAddress ) {	
@@ -409,6 +436,10 @@ $AdGlobalCatalog = Get-AdGlobalCatalog
 
 Write-Verbose "AdGlobalCatalog = $AdGlobalCatalog"
 
+if (Test-RegexPattern -RegexPattern $IdentityRegex) {
+    Write-Verbose 'IdentityRegx is a valid Regex pattern'
+}
+
 If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 
 	Foreach ($CsvUser in $AllCsvUsers) {
@@ -423,7 +454,7 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 		Write-Progress -Activity "Processing Users" -Status "Processing $RowNumber of $AllCsvUsersCount)" -PercentComplete (($RowNumber / $AllCsvUsersCount) * 100)
 		$RowNumber += 1
 
-        	Write-Verbose "Identity = $($CsvUser.Identity)"
+        	Write-Verbose "CSV Identity = $($CsvUser.Identity)"
 
 		If ( $AdUser = Get-AdUserInformation -GlobalCatalog $AdGlobalCatalog -Identity $($CsvUser.Identity) ) {
 			Write-Verbose "Identity found in AD"
