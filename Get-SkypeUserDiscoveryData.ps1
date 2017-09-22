@@ -221,12 +221,9 @@ function Get-AdUserInformation {
 	if ( $AdUser = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -Properties Enabled,proxyaddresses,msRTCSIP-UserEnabled,msRTCSIP-PrimaryUserAddress ) {	
 		#Identity found
 		
-		$upn 				= $AdUser.userPrincipalName.ToLower()	
-		$proxyaddresses     = $AdUser.proxyaddresses
-		$PrimarySmtp 		= $null
-		$PrimarySip			= $null
-		$ProxySip    		= $null
-		$errFlags 			= @()
+		$upn		= $AdUser.userPrincipalName.ToLower()	
+		$proxyaddresses	= $AdUser.proxyaddresses
+		$errFlags	= @()
 		
 		# Is user Lync/Skype Enabled?
 		if ( $AdUser."msRTCSIP-UserEnabled" ) {
@@ -275,7 +272,7 @@ function Get-AdUserInformation {
 	
 		# If CheckExoRoutingDomain is set and there is no ExoRouting Address, log Error 
 		if ($CheckExoRoutingDomain -and -Not $ExoRoutingAddress) {
-			$errFlags += 'No_Msol_Smtp'
+			$errFlags += 'No_ExoRouting_Smtp'
 		}
 
 		# If we have a userPrincipalName with at least one of: Smtp or Sip
