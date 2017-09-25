@@ -4,7 +4,7 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.8
+	Version: 1.1.9
 	Updated: 9/25/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
@@ -452,6 +452,7 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 		If ( $AdUser = Get-AdUserInformation -GlobalCatalog $AdGlobalCatalog -Identity $($CsvUser.Identity) ) {
 			Write-Verbose "Identity found in AD"
 			$objReportItem = $objReportTemplate.PSObject.Copy()
+			$objReportItem.ErrorFlags = $AdUser.ErrorFlags
 			$objReportItem.FirstName = $($AdUser.FirstName)
 			$objReportItem.LastName = $($AdUser.LastName)
 			$objReportItem.AdEnabled = $AdUser.Enabled
@@ -487,7 +488,6 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 				$objReportItem.RegistrarPool = $CsUser.RegistrarPool
 				$objReportItem.LineUri = $CsUser.LineUri
 				$objReportItem.EnterpriseVoiceEnabled = $CsUser.EnterpriseVoiceEnabled
-				$objReportItem.ErrorFlags = $AdUser.ErrorFlags
 			}
 			Else {
 				Write-Verbose "Identity is NOT Lync/Skype enabled"
@@ -496,8 +496,8 @@ If ($AllCsvUsers = Test-CsvFormat $FilePath) {
 		Else {
 			Write-Verbose "Identity NOT found in AD"
 			$objReportItem = $objReportTemplate.PSObject.Copy()
-			$objReportItem.CsvIdentity = $CsvUser.Identity
 			$objReportItem.ErrorFlags = ('AdUser_NotFound')
+			$objReportItem.CsvIdentity = $CsvUser.Identity
 		}
 
 	    $objReportItem
