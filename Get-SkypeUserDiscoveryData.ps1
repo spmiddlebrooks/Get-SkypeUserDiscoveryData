@@ -4,8 +4,8 @@
 .PARAMETER
 .EXAMPLE
 .NOTES
-	Version: 1.1.7
-	Updated: 9/22/2017
+	Version: 1.1.8
+	Updated: 9/25/2017
 	Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 .LINK
 	https://github.com/spmiddlebrooks
@@ -26,15 +26,11 @@ param(
         [ValidateSet('SamAccountName','mail','userPrincipalName')]
         [string] $IdentityAttribute = 'userPrincipalName',
 	[Parameter(Mandatory=$False)]
-		[string] $IdentityRegEx = '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b',
+		[string] $IdentityRegEx = '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b', # samAccountname \b(?:(?:[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,][^\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,]{0,62}[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])|[^.\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])\b
 	[Parameter(Mandatory=$False)]
-		[switch] $CheckExoRoutingDomain,
+		[string] $ExoRoutingDomain, # = "tenant.mail.onmicrosoft.com",
 	[Parameter(Mandatory=$False)]
-		[string] $ExoRoutingDomain = "tenant.mail.onmicrosoft.com",
-	[Parameter(Mandatory=$False)]
-		[switch] $CheckForInvalidDomains,
-	[Parameter(Mandatory=$False)]
-		[string] $InvalidDomainRegex = ".+@()"
+		[string] $InvalidDomainRegex # = ".+@()"
 )
 
 function Set-ModuleStatus { 
@@ -131,13 +127,13 @@ function Test-ForInvalidCharacters {
 		https://github.com/spmiddlebrooks
 	#>
 	param (
-		[string] $strAddress,
-		[string] $addressType
+		[string] $Address,
+		[string] $AddressType
 	)
 
-	$arrAddress = $strAddress -split '@'
-	if ( $($arrAddress[0]) -match "[\'\&\<\>\`\*\@\\\[\]\{\}\^\:\,\$\=\!\#\(\)\%\|\+\?\/\~]" ) {
-		return ('Invalid_Char_' + $addressType)
+	$AddressParts = $Address -split '@'
+	if ( $($AddressParts[0]) -match "[\'\&\<\>\`\*\@\\\[\]\{\}\^\:\,\$\=\!\#\(\)\%\|\+\?\/\~]" ) {
+		return ('Invalid_Char_' + $AddressType)
 	}
 }
 # End function Test-ForInvalidCharaters
@@ -200,8 +196,8 @@ function Get-AdUserInformation {
 	.PARAMETER
 	.EXAMPLE
 	.NOTES
-		Version: 1.1.4
-		Updated: 9/22/2017
+		Version: 1.1.7
+		Updated: 9/25/2017
 		Original Author: Scott Middlebrooks (Git Hub: spmiddlebrooks)
 	.LINK
 		https://github.com/spmiddlebrooks
@@ -212,10 +208,19 @@ function Get-AdUserInformation {
 	)
     [bool] $CsUserEnabled = $false
 
-    if ($IdentityRegex -and $Identity -match $IdentityRegex) {
+    if ($IdentityAttribute -eq 'samAccountName' -and $IdentityRegex -eq '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b') {
+	$IdentityRegex = '\b(?:(?:[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,][^\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,]{0,18}[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])|[^.\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])\b'
+    }
+	
+    if ($Identity -match $IdentityRegex) {
         $Identity = $Matches[1]
         $Matches.Clear()
         Write-Verbose "Regex matched Identity = $Identity"
+    }
+    else {
+        # TODO Error handling 
+        # IdentityRegex match failed
+    	return $false
     }
 
 	if ( $AdUser = Get-AdUser -Server "$($GlobalCatalog):3268" -Filter {$IdentityAttribute -eq $Identity} -Properties Enabled,proxyaddresses,msRTCSIP-UserEnabled,msRTCSIP-PrimaryUserAddress ) {	
@@ -223,44 +228,51 @@ function Get-AdUserInformation {
 		
 		$upn		= $AdUser.userPrincipalName.ToLower()	
 		$proxyaddresses	= $AdUser.proxyaddresses
-		$errFlags	= @()
+		$errFlags	= @()		
 		
 		# Is user Lync/Skype Enabled?
 		if ( $AdUser."msRTCSIP-UserEnabled" ) {
 			$CsUserEnabled = $true
 
 			# Check that msRTCSIP-PrimaryUserAddress exists with correct format
-			if ( $AdUser."msRTCSIP-PrimaryUserAddress" -and $AdUser."msRTCSIP-PrimaryUserAddress" -match 'sip:(.+@[\w-\.]+)' ) {
+			if ( $AdUser."msRTCSIP-PrimaryUserAddress" -and $AdUser."msRTCSIP-PrimaryUserAddress" -match '^sip:(.+@[\w-\.]+)$' ) {
 				# Convert to all lowercase		
 				$PrimarySip = $Matches[1].ToLower()
 				$Matches.Clear()
+				$errFlags += Test-ForInvalidCharacters -Address $PrimarySip -AddressType 'PrimarySip'
 			}
 			# If msRTCSIP-PrimaryUserAddress exists but is not the correct format, log Error
 			elseif ($AdUser."msRTCSIP-PrimaryUserAddress") {
 				$errFlags = 'PrimarySIP_Exists_InvalidFormat'
 			}
+            		# User is Cs enabled, but does not have msRTCSIP-PrimaryUserAddress configured
+            		else {
+                		$errFlags = 'CsUser_Enabled_No_PrimarySIP'
+            		}			
 		}
 	
 		# Extract primary SMTP and SIP addresses from proxyaddresses attribute
 		foreach ($proxyaddress in $proxyaddresses) {
-			if ($proxyaddress -match "(SMTP|SIP):(.+@[\w-\.]+);?" ) {
+			if ($proxyaddress -match '(SMTP|SIP):(.+@[\w-\.]+);?' ) {
 				$qualifier = $matches[1]
 				$address   = $matches[2]
 			
 				if ($qualifier -match 'SIP') {
 					$ProxySip = $address.tolower()
+					$errFlags += Test-ForInvalidCharacters -Address $ProxySip -AddressType 'ProxySip'
 				}
 				elseif ($qualifier -match 'SMTP') {
 					### Get primary SMTP address
 					if ($qualifier -cmatch 'SMTP') {
 						$PrimarySmtp = $address.tolower()
+						$errFlags += Test-ForInvalidCharacters -Address $PrimarySmtp -AddressType 'PrimarySmtp'
 					}
 					### Check for O365 mail routing domain
-					elseif ($CheckExoRoutingDomain -AND $address -match $ExoRoutingDomain) {
+					elseif ($ExoRoutingDomain -AND $address -match $ExoRoutingDomain) {
 						$ExoRoutingAddress = $address.tolower()
 					}
 					### Check for invalid email domains
-					elseif ($CheckForInvalidDomains -AND $address -match $InvalidDomainRegex) {
+					elseif ($InvalidDomainRegex -AND $address -match $InvalidDomainRegex) {
 						$errFlags += 'Invalid_Email_Domain'
 					}
 				}
@@ -268,57 +280,43 @@ function Get-AdUserInformation {
 			}
 		}
 	
-		# If CheckExoRoutingDomain is set and there is no ExoRouting Address, log Error 
-		if ($CheckExoRoutingDomain -and -Not $ExoRoutingAddress) {
-			$errFlags += 'No_ExoRouting_Smtp'
+		# If ExoRoutingDomain is set and there is no ExoRouting Address, log Error 
+		if ($ExoRoutingDomain -and -Not $ExoRoutingAddress) {
+			$errFlags += 'No_ExoRouting_Address'
 		}
 
 		# If we have a userPrincipalName with at least one of: Smtp or Sip
 		if ($upn -AND ($PrimarySmtp -OR $PrimarySip -OR $ProxySip)) {
-			$errFlags += Test-ForInvalidCharacters $upn 'Upn'
-	
+			$errFlags += Test-ForInvalidCharacters -Address $upn -AddressType 'Upn'
 			### PrimarySmtp address checks
-			# If we have a SMTP address and userPrincipalName and SMTP match
-			if ($PrimarySmtp -AND $upn -eq $PrimarySmtp) {
-				$errFlags += Test-ForInvalidCharacters $PrimarySmtp 'PrimarySmtp'
-			}
-			elseif (!$PrimarySmtp) {
+			# If we do not have a SMTP address
+			if (-Not $PrimarySmtp) {
 				$errFlags += 'No_PrimarySmtp'
 			}
-			else {
+			elseif ($upn -ne $PrimarySmtp) {
 				$errFlags += 'Upn_NE_PrimarySmtp'
 			}
-	
 			### PrimarySip & ProxySip address checks
 			if ($CsUserEnabled) {
 				if ( $PrimarySip -AND $upn -eq $PrimarySip ) {
-					$errFlags += Test-ForInvalidCharacters $PrimarySip 'PrimarySip'
-		
-					if ($ProxySip -AND $upn -eq $ProxySip) {
-						$errFlags += Test-ForInvalidCharacters $ProxySip 'ProxySip'
-					}
-					elseif (!$ProxySip) {
+					if (-Not $ProxySip) {
 						$errFlags += 'PrimaySIP_without_ProxySip'
 					}
-					else {
+					elseif ($ProxySip -ne $PrimarySip) {
 						$errFlags += 'ProxySIP_NE_Upn_PrimarySIP'
 					}
 				}
-				elseif (!$PrimarySip) {
-					$errFlags += 'No_PrimarySip'
-		
-					if ($ProxySip) {
-						$errFlags += 'ProxySIP_without_PrimarySip'
-					}
+				elseif ($ProxySip -and -Not $PrimarySip) {
+					$errFlags += 'ProxySIP_without_PrimarySip'
 				}
-				else {
+				elseif ($upn -ne $PrimarySip -and $upn -ne $ProxySip) {
 					$errFlags += 'Upn_NE_PrimarySip_ProxySip'
 				}
 			}
 		}
 		# If we only have userPrincipalName without any of the other addresses
 		elseif ($upn) {
-			$errFlags += Test-ForInvalidCharacters $upn 'Upn'
+			$errFlags += Test-ForInvalidCharacters -Address $upn -AddressType 'Upn'
 			$errFlags += 'Upn_without_Smtp_Sip'
 		}
 		else {
@@ -329,9 +327,9 @@ function Get-AdUserInformation {
 			FirstName = $($AdUser.GivenName)
 			LastName = $($AdUser.Surname)
 			Enabled = $($AdUser.Enabled)
-            CsEnabled = $CsUserEnabled
+			CsEnabled = $CsUserEnabled
 			samAccountName = $($AdUser.samAccountName.ToLower())
-			userPrincipalName = $($AdUser.userPrincipalName.ToLower())
+			userPrincipalName = $($AdUser.userPrincipalName)
 			PrimarySmtp = $PrimarySmtp
 			PrimarySip = $PrimarySip
 			ProxySip = $ProxySip
