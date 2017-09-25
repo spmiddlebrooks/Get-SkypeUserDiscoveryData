@@ -26,7 +26,7 @@ param(
         [ValidateSet('SamAccountName','mail','userPrincipalName')]
         [string] $IdentityAttribute = 'userPrincipalName',
 	[Parameter(Mandatory=$False)]
-		[string] $IdentityRegEx = '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b', # samAccountname \b(?:(?:[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,][^\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,]{0,62}[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])|[^.\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])\b
+		[string] $IdentityRegEx = '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b', # samAccountname \b(?:([^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,][^\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,]{0,62}[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])|[^.\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])\b
 	[Parameter(Mandatory=$False)]
 		[string] $ExoRoutingDomain, # = "tenant.mail.onmicrosoft.com",
 	[Parameter(Mandatory=$False)]
@@ -209,7 +209,7 @@ function Get-AdUserInformation {
     [bool] $CsUserEnabled = $false
 
     if ($IdentityAttribute -eq 'samAccountName' -and $IdentityRegex -eq '\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b') {
-	$IdentityRegex = '\b(?:(?:[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,][^\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,]{0,18}[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])|[^.\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])\b'
+	$IdentityRegex = '\b(?:([^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,][^\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,]{0,18}[^. \"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])|[^.\"\/\\\[\]\:\|\\+\=\;\?\*\<\>\,])\b'
     }
 	
     if ($Identity -match $IdentityRegex) {
